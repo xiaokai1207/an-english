@@ -155,6 +155,10 @@ const Mic = {
     return pcm;
   },
 
+  // stop tears the mic down and returns a promise that resolves once the
+  // recording AudioContext has fully closed. On Android the 16 kHz mic
+  // context and the sound-effect context fight over the audio hardware, so
+  // callers await this before playing a chime to avoid a swallowed first note.
   stop() {
     if (this.processor) this.processor.onaudioprocess = null;
     try {
@@ -165,12 +169,21 @@ const Mic = {
       console.warn('Mic teardown hiccup.', err);
     }
     if (this.stream) this.stream.getTracks().forEach((t) => t.stop());
-    if (this.ctx && this.ctx.state !== 'closed') this.ctx.close();
+    const ctx = this.ctx;
     this.ctx = null;
     this.stream = null;
     this.source = null;
     this.processor = null;
     this.mute = null;
+    if (ctx && ctx.state !== 'closed') {
+      try {
+        const closed = ctx.close();
+        return (closed && closed.then) ? closed : Promise.resolve();
+      } catch (err) {
+        return Promise.resolve();
+      }
+    }
+    return Promise.resolve();
   },
 };
 
@@ -409,6 +422,9 @@ const FollowRead = {
   startRead() {
     if (this.state === 'recording' || this.state === 'evaluating') return;
     TTS.stop();
+    // Keep the effect context awake through the recording so the win chime
+    // fires cleanly the moment the mic releases the audio hardware.
+    SFX.warmUp();
     this.cleanup();
     const session = new IseSession(this.text);
     this.session = session;
@@ -473,27 +489,26 @@ const FollowRead = {
 
   handleResult(result) {
     if (this.state !== 'evaluating') return;
-    Mic.stop();
     this.lastScore = result.score;
     this.lastReason = result.reason;
+    // Wait for the mic's 16 kHz AudioContext to fully close before playing a
+    // chime. On Android the recording and effect contexts fight over the
+    // audio hardware; firing the sound while the mic is still releasing made
+    // the "ta-da" arrive as a lone "da". Awaiting the close, then using the
+    // safe (extra-lead + primer) variant, keeps every note intact.
+    const closed = Mic.stop();
     if (result.passed) {
       this.state = 'passed';
       this.render();
-      // Play the chime after the mic's AudioContext has finished tearing
-      // down and the pass DOM has painted. Closing the mic context in the
-      // same tick as starting a new sound made the browser drop the first
-      // notes (the "ta-da" arrived as a lone "da"); confetti's DOM burst then
-      // starved the audio scheduler further. Deferring past both keeps every
-      // note intact, then confetti fires once the sound is safely scheduled.
-      setTimeout(() => {
-        SFX.readPass();
-        setTimeout(() => confetti(), 120);
-      }, 60);
+      closed.then(() => {
+        SFX.readPass(true);
+        setTimeout(() => confetti(), 140);
+      });
       if (this.onPass) this.onPass();
     } else {
       this.state = 'failed';
       this.render();
-      setTimeout(() => SFX.readFail(), 60);
+      closed.then(() => SFX.readFail());
     }
   },
 

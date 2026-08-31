@@ -320,16 +320,54 @@ const SFX = {
     return this.ctx;
   },
 
+  // warmUp nudges the effect context awake and plays an inaudible tick. Call
+  // it before opening the mic so the effect context is already running when
+  // the read-aloud round ends, so the win chime does not lose its first note.
+  warmUp() {
+    const ctx = this.ensure();
+    if (!ctx) return;
+    if (ctx.state !== 'running' && ctx.resume) ctx.resume().catch(() => {});
+    try {
+      this.renderTone(ctx, ctx.currentTime + 0.02, {
+        freq: 200, duration: 0.03, gain: 0.0002, type: 'sine',
+      });
+    } catch (err) {
+      // scheduling can throw if the context is mid-resume; safe to ignore
+    }
+  },
+
   // play renders a whole effect. It resumes the context first, then anchors
   // every voice to one shared base time so an effect always sounds as one
   // continuous phrase - never a note dropped mid-way. A generous lead keeps
   // the opening note clear of the Android wake-up gap.
   play(voices) {
+    this.render(voices, 0);
+  },
+
+  // playSafe is for effects fired right after the microphone closed. On
+  // Android the recording context leaves the shared audio hardware busy, so
+  // the effect context needs a bigger lead and a silent primer note to wake
+  // the output path before the real notes; otherwise the first note (the
+  // "ta") is swallowed and only the "da" survives.
+  playSafe(voices) {
+    this.render(voices, 0.26);
+  },
+
+  // render resumes the context, then schedules every voice against one base
+  // time. extraLead adds head-room on top of the normal wake gap; when set,
+  // a near-silent primer is scheduled at base to open the audio path first.
+  render(voices, extraLead) {
     const ctx = this.ensure();
     if (!ctx) return;
-    const render = () => {
-      const lead = ctx.state === 'running' ? 0.06 : 0.18;
-      const base = ctx.currentTime + lead;
+    const paint = () => {
+      const wake = ctx.state === 'running' ? 0.06 : 0.2;
+      const base = ctx.currentTime + wake + (extraLead || 0);
+      if (extraLead) {
+        // silent primer: opens the hardware path just before the real notes
+        this.renderTone(ctx, base - extraLead + 0.02, {
+          freq: 200, duration: extraLead, gain: 0.0002, type: 'sine',
+        });
+      }
       voices.forEach((voice) => this.renderVoice(ctx, base, voice));
     };
     // Any non-running state (suspended, or iOS's "interrupted" after the mic
@@ -338,11 +376,11 @@ const SFX = {
     if (ctx.state !== 'running') {
       const resumed = ctx.resume();
       if (resumed && resumed.then) {
-        resumed.then(render).catch(render);
+        resumed.then(paint).catch(paint);
         return;
       }
     }
-    render();
+    paint();
   },
 
   // renderVoice draws one voice of an effect at base + its own delay.
@@ -450,8 +488,9 @@ const SFX = {
 
   // readPass is a punchy ta-da: a small chord answered by a big sustained
   // chord with a bell on top - an instant "you got it!" moment. It doubles
-  // as the correct-answer sound for Listen & Tap.
-  readPass() {
+  // as the correct-answer sound for the games. Pass safe=true right after the
+  // microphone closed so it schedules with extra head-room on Android.
+  readPass(safe) {
     const voices = [
       { freq: 523, duration: 0.14, delay: 0, gain: 0.09, type: 'square' },
       { freq: 659, duration: 0.14, delay: 0, gain: 0.09, type: 'square' },
@@ -461,7 +500,11 @@ const SFX = {
       { freq: 1568, duration: 1, delay: 0.16, gain: 0.055, type: 'square' },
       { kind: 'bell', freq: 2093, delay: 0.16, gain: 0.07 },
     ];
-    this.play(voices);
+    if (safe) {
+      this.playSafe(voices);
+    } else {
+      this.play(voices);
+    }
   },
 
   // readFail is an urgent two-tone alarm, strong like a little warning siren
