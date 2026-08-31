@@ -85,38 +85,38 @@ http://<电脑IP>:8000
 
 ## 部署到线上（HTTPS 托管）
 
-跟读评分需要麦克风权限，手机浏览器只在 **HTTPS** 页面下弹授权框（本地 `file://` 和局域网 `http://IP:端口` 都不行，朗读等其他功能不受影响）。把页面挂到任意免费静态托管即可，本项目使用 EdgeOne Pages。
+跟读评分需要麦克风权限，手机浏览器只在 **HTTPS** 页面下弹授权框（本地 `file://` 和局域网 `http://IP:端口` 都不行，朗读等其他功能不受影响）。本项目用 **Cloudflare Pages** 托管：免费、支持私有仓库、地址固定不过期，每次 `git push` 自动部署。
 
-### 部署范围
+### 为什么不用 GitHub Pages
 
-只需上传以下内容，其他文件（README、培养计划文档、试听页等）不要上传：
+GitHub Pages 对**私有仓库需付费**。本仓库的 `assets/xfyun-config.js` 含讯飞密钥不能公开，因此选用对私有仓库免费的 Cloudflare Pages。
 
-```
-index.html
-assets/     # 整个目录，含 xfyun-config.js
-```
+### 首次配置（一次性，在 Cloudflare 网页完成）
 
-### 方式一：EdgeOne Pages（本项目在用）
+1. 注册并登录 [Cloudflare](https://dash.cloudflare.com/)（免费）
+2. 左侧 **Workers & Pages → Create → Pages → Connect to Git**
+3. 授权并选择本仓库 `an-english`，分支选 `main`
+4. 构建设置：
+   - **Framework preset**：`None`
+   - **Build command**：`sh build.sh`
+   - **Build output directory**：`dist`
+5. 点 **Save and Deploy**，等首次构建完成即可拿到固定地址 `https://<项目名>.pages.dev`
 
-**用 CodeBuddy 部署（最简单）**：在对话里说「帮我部署到 EdgeOne Pages」，会自动上传并返回访问链接。
+之后无需任何手动操作：**每次 push 到 main，Cloudflare 自动重新构建部署**，地址不变、不过期。
 
-**手动部署**：
+### 部署范围（由 build.sh 控制）
 
-1. 打开 [EdgeOne Pages 控制台](https://console.cloud.tencent.com/edgeone/pages)（需腾讯云账号）
-2. 创建项目 → 选择「上传本地文件」（或关联 Git 仓库）
-3. 上传只含 `index.html + assets` 的目录，项目类型选「静态站点」
-4. 部署完成后即可用返回的地址访问
+`build.sh` 只把 `index.html + assets` 收集到 `dist/`，`english-learning-plan.md`（含个人规划）、`sound-picker.html`（音效试听页）不会上线。
 
-**重要提示**：
+### 重要提示
 
-- 国内访问的预览链接（`*.edgeone.cool` 域名、带 `eo_token` 参数）约 **3 小时过期**，过期后重新部署拿新链接即可；给孩子长期使用，请到项目设置**绑定自定义域名**，以后地址固定不变
-- 托管地址不要公开分享：密钥在前端文件里，可能被人提取、消耗免费评测额度（见上文跟读功能的说明）
+- **保持仓库 Private**：`xfyun-config.js` 的密钥会随代码进仓库，纯静态托管下也会暴露在浏览器里（这类方案的固有特性），仅供家庭自用
+- 不要把 `*.pages.dev` 地址公开分享给不信任的人，避免密钥被提取消耗免费额度
+- 学习进度保存在浏览器 localStorage 且与访问域名绑定：**换地址 = 进度清零**。换地址或换设备前，先在 Grown-ups → Data 导出 JSON 备份
 
-### 方式二：其他静态托管
+### 备用：EdgeOne Pages 手动部署
 
-GitHub Pages / Vercel / Netlify 等任意静态托管均可：同样只传 `index.html + assets`，纯静态、无需构建。
-
-> 学习进度保存在浏览器 localStorage 且与访问域名绑定：**换地址 = 进度清零**。换地址或换设备前，先在 Grown-ups → Data 导出 JSON 备份。
+不想用 Cloudflare 时，也可让 CodeBuddy 「帮我部署到 EdgeOne Pages」手动上传，但拿到的是约 **3 小时过期**的预览链接，不适合长期使用。
 
 ## 数据与备份
 

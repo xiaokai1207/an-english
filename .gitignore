@@ -7,3 +7,6 @@
 
 # Local-only build copy used for manual EdgeOne uploads
 deploy/
+
+# Cloudflare Pages build output
+dist/
