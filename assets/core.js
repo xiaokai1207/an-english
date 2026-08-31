@@ -537,8 +537,24 @@ const U = {
     return d.toISOString().slice(0, 10);
   },
 
+  // allWeeks flattens every phase into one week list so week numbers run
+  // continuously (1..N) across the whole plan.
   allWeeks() {
-    return LEARNING_DATA.phases[0].weeks;
+    return LEARNING_DATA.phases.reduce((acc, phase) => acc.concat(phase.weeks), []);
+  },
+
+  // lastWeek is the highest week number available, used to cap navigation
+  // instead of a hard-coded phase length.
+  lastWeek() {
+    const weeks = this.allWeeks();
+    return weeks.length ? weeks[weeks.length - 1].week : 1;
+  },
+
+  // phaseOf returns the phase object that owns a given week number.
+  phaseOf(weekNo) {
+    return LEARNING_DATA.phases.find(
+      (phase) => phase.weeks.some((wk) => wk.week === weekNo),
+    ) || LEARNING_DATA.phases[0];
   },
 
   weekData(weekNo) {

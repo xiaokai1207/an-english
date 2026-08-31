@@ -54,13 +54,14 @@ const Views = {
     const newLeft = wk.words.filter((w) => !st.words[w.word]).length;
 
     let weekAction;
+    const lastWeek = U.lastWeek();
     if (wk.review && U.learnedWords().length === 0) {
       weekAction = '<div class="hint">Learn some words first! 🐥</div>';
-    } else if (done && st.currentWeek < 24) {
+    } else if (done && st.currentWeek < lastWeek) {
       weekAction = `<button class="btn-next" onclick="Views.nextWeek()">`
         + `🎉 Week ${st.currentWeek} done! Start Week ${st.currentWeek + 1} ›</button>`;
-    } else if (done && st.currentWeek === 24) {
-      weekAction = '<div class="hint">🎉 Phase 1 complete! Amazing!</div>';
+    } else if (done && st.currentWeek === lastWeek) {
+      weekAction = '<div class="hint">🎉 All weeks complete! Amazing!</div>';
     } else {
       weekAction = `<button class="btn-next" onclick="nav('learn')">`
         + `📖 Learn today's words${newLeft ? ` (${newLeft} new)` : ''} ›</button>`;
@@ -105,7 +106,7 @@ const Views = {
 
   nextWeek() {
     const st = Store.state;
-    if (st.currentWeek < 24) {
+    if (st.currentWeek < U.lastWeek()) {
       st.currentWeek += 1;
       Store.save();
       SFX.win();
@@ -267,19 +268,25 @@ const Views = {
     const mastered = U.allUniqueWords().filter((w) => U.mastery(w.word) === 3).length;
     const pct = Math.round((total / goal) * 100);
     const abc = ABC.counts();
-    const rows = U.allWeeks().map((wk) => {
-      const learned = U.learnedCountInWeek(wk.week);
-      const pctW = wk.words.length ? Math.round((learned / wk.words.length) * 100) : 0;
-      return `<tr class="${wk.week === st.currentWeek ? 'cur' : ''}">
-        <td>W${wk.week}</td><td>${wk.emoji} ${U.esc(wk.themeZh)}</td>
-        <td>${learned}/${wk.words.length}</td>
-        <td><div class="bar"><div class="bar-in" style="width:${pctW}%"></div></div></td>
-      </tr>`;
+    const phase = U.phaseOf(st.currentWeek);
+    // one table, grouped by phase so 100+ weeks stay readable
+    const rows = LEARNING_DATA.phases.map((p) => {
+      const head = `<tr class="phase-head"><td colspan="4">${U.esc(p.nameZh)}</td></tr>`;
+      const body = p.weeks.map((wk) => {
+        const learned = U.learnedCountInWeek(wk.week);
+        const pctW = wk.words.length ? Math.round((learned / wk.words.length) * 100) : 0;
+        return `<tr class="${wk.week === st.currentWeek ? 'cur' : ''}">
+          <td>W${wk.week}</td><td>${wk.emoji} ${U.esc(wk.themeZh)}</td>
+          <td>${learned}/${wk.words.length}</td>
+          <td><div class="bar"><div class="bar-in" style="width:${pctW}%"></div></div></td>
+        </tr>`;
+      }).join('');
+      return head + body;
     }).join('');
 
     return `
       <div class="pcard">
-        <div class="pcard-title">第一阶段进度 · Phase 1</div>
+        <div class="pcard-title">当前阶段 · ${U.esc(phase.nameZh)}</div>
         <div class="stat-row">
           <div class="stat"><div class="stat-num">${total}</div><div class="stat-zh">已学单词</div></div>
           <div class="stat"><div class="stat-num">${mastered}</div><div class="stat-zh">熟练掌握 ⭐⭐⭐</div></div>
@@ -287,7 +294,7 @@ const Views = {
           <div class="stat"><div class="stat-num">🔥 ${st.streak.days}</div><div class="stat-zh">连续天数</div></div>
         </div>
         <div class="progress-outer"><div class="progress-inner" style="width:${pct}%"></div></div>
-        <div class="progress-zh">词汇目标 ${goal} 词 · 已完成 ${pct}%（阶段目标 300-400）</div>
+        <div class="progress-zh">全部词汇 ${goal} 词 · 已完成 ${pct}%</div>
       </div>
       <div class="pcard">
         <div class="pcard-title">ABC 基础能力 · 字母 / 拼读 / 高频词</div>

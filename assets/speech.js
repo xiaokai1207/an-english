@@ -479,7 +479,7 @@ const FollowRead = {
     if (result.passed) {
       this.state = 'passed';
       this.render();
-      SFX.readPass();
+      SFX.correct();
       confetti();
       if (this.onPass) this.onPass();
     } else {

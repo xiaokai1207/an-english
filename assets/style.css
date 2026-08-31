@@ -1268,6 +1268,15 @@ button {
   font-weight: 800;
 }
 
+.week-table tr.phase-head td {
+  background: #FFF1D6;
+  color: var(--ink);
+  font-weight: 800;
+  font-size: 13px;
+  text-align: center;
+  border-radius: 8px;
+}
+
 .week-table td:last-child {
   width: 40%;
 }
