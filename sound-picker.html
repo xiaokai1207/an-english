@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>音效试听室</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Helvetica Neue', sans-serif;
+    background: #FFF6E3;
+    color: #4A3B2A;
+    padding: 24px 16px 60px;
+    max-width: 640px;
+    margin: 0 auto;
+  }
+  h1 { font-size: 26px; text-align: center; }
+  .sub {
+    text-align: center; font-size: 14px; color: #9C8A72;
+    margin: 8px 0 26px; line-height: 1.6;
+  }
+  h2 {
+    font-size: 19px; margin: 30px 0 6px;
+  }
+  .group-note { font-size: 13px; color: #9C8A72; margin-bottom: 14px; }
+  .card {
+    background: #FFFFFF;
+    border-radius: 18px;
+    box-shadow: 0 4px 0 #EBDFC8;
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 12px;
+    transition: transform 0.12s;
+    border: 3px solid transparent;
+  }
+  .card.playing {
+    border-color: #51CF66;
+    transform: scale(1.02);
+    animation: bounce 0.5s;
+  }
+  @keyframes bounce {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.04); }
+  }
+  .play {
+    width: 54px;
+    height: 54px;
+    min-width: 54px;
+    border: none;
+    border-radius: 50%;
+    background: #51CF66;
+    color: #FFFFFF;
+    font-size: 22px;
+    box-shadow: 0 4px 0 #3FAF52;
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.1s;
+  }
+  .play:active { transform: translateY(3px); box-shadow: none; }
+  .info { flex: 1; min-width: 0; }
+  .name { font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .tag {
+    font-size: 11px; font-weight: 700; color: #FFFFFF;
+    background: #FF922B; border-radius: 8px; padding: 2px 8px;
+  }
+  .desc { font-size: 13px; color: #9C8A72; margin-top: 4px; line-height: 1.5; }
+  .playall {
+    width: 100%;
+    border: none;
+    border-radius: 16px;
+    background: #4DABF7;
+    color: #FFFFFF;
+    font-size: 16px;
+    font-weight: 800;
+    padding: 14px;
+    box-shadow: 0 4px 0 #2FA8CC;
+    cursor: pointer;
+    margin-bottom: 16px;
+    transition: transform 0.1s, box-shadow 0.1s;
+  }
+  .playall:active { transform: translateY(3px); box-shadow: none; }
+  .playall:disabled { opacity: 0.5; }
+  .footer {
+    margin-top: 40px;
+    background: #FFFFFF;
+    border-radius: 18px;
+    box-shadow: 0 4px 0 #EBDFC8;
+    padding: 18px;
+    font-size: 14px;
+    line-height: 1.8;
+  }
+  .footer b { color: #E8590C; }
+</style>
+</head>
+<body>
+<h1>🔔 音效试听室</h1>
+<p class="sub">
+  「答对了」和「通关了」的候选音效都在这里<br>
+  点卡片试听 · 也可整组连播对比 · 挑好后记住编号告诉我
+</p>
+
+<h2>✅ 答对了（读对单词的提示音）</h2>
+<p class="group-note">要求：短促、清脆、开心，孩子听了想再来一次</p>
+<button class="playall" id="pass-all" onclick="playGroup('pass')">▶ 依次试听全部（8 个）</button>
+<div id="pass-list"></div>
+
+<h2>🏆 通关了（完成学习 / 游戏胜利）</h2>
+<p class="group-note">要求：激昂、兴奋、有仪式感，像赢了整场比赛</p>
+<button class="playall" id="win-all" onclick="playGroup('win')">▶ 依次试听全部（7 个）</button>
+<div id="win-list"></div>
+
+<div class="footer">
+  <b>怎么反馈：</b>告诉我编号即可，例如「答对用 A5，通关用 B6」。<br>
+  <b>手机试听：</b>孩子最终在手机上听，建议把这个文件拷到手机上打开对比效果（单个文件、无需联网）。<br>
+  <b>音量：</b>建议把设备音量调到平时给孩子用的高度再听。
+</div>
+
+<script>
+let ctx = null;
+
+// ac lazily creates the shared AudioContext on first tap (mobile requires it).
+function ac() {
+  if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+  if (ctx.state === 'suspended') ctx.resume();
+  return ctx;
+}
+
+// tone plays one steady note with a fast attack and smooth decay.
+function tone(freq, dur, delay, gain, type) {
+  const c = ac();
+  const t = c.currentTime + (delay || 0);
+  const osc = c.createOscillator();
+  const vol = c.createGain();
+  osc.type = type || 'sine';
+  osc.frequency.value = freq;
+  vol.gain.setValueAtTime(0.0001, t);
+  vol.gain.exponentialRampToValueAtTime(gain || 0.12, t + 0.015);
+  vol.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  osc.connect(vol);
+  vol.connect(c.destination);
+  osc.start(t);
+  osc.stop(t + dur + 0.05);
+}
+
+// bell rings a bell-like ding: fundamental plus inharmonic partials, each
+// fading at its own speed - synthesized, no audio file needed.
+function bell(freq, delay, gain) {
+  const c = ac();
+  const t = c.currentTime + (delay || 0);
+  [[freq, 1, 1], [freq * 2, 0.4, 0.55], [freq * 2.76, 0.22, 0.35]].forEach((p) => {
+    const osc = c.createOscillator();
+    const vol = c.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = p[0];
+    vol.gain.setValueAtTime(0.0001, t);
+    vol.gain.exponentialRampToValueAtTime((gain || 0.14) * p[1], t + 0.012);
+    vol.gain.exponentialRampToValueAtTime(0.0001, t + p[2]);
+    osc.connect(vol);
+    vol.connect(c.destination);
+    osc.start(t);
+    osc.stop(t + p[2] + 0.05);
+  });
+}
+
+// slide sweeps a pitch from f1 up (or down) to f2 - whoosh / pop textures.
+function slide(f1, f2, dur, delay, gain, type) {
+  const c = ac();
+  const t = c.currentTime + (delay || 0);
+  const osc = c.createOscillator();
+  const vol = c.createGain();
+  osc.type = type || 'sine';
+  osc.frequency.setValueAtTime(f1, t);
+  osc.frequency.exponentialRampToValueAtTime(f2, t + dur);
+  vol.gain.setValueAtTime(0.0001, t);
+  vol.gain.exponentialRampToValueAtTime(gain || 0.12, t + 0.015);
+  vol.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  osc.connect(vol);
+  vol.connect(c.destination);
+  osc.start(t);
+  osc.stop(t + dur + 0.05);
+}
+
+// vibrato holds one brassy note with vibrato - the triumphant long note.
+function vibrato(freq, delay, dur, gain) {
+  const c = ac();
+  const t = c.currentTime + delay;
+  const osc = c.createOscillator();
+  const vol = c.createGain();
+  const lfo = c.createOscillator();
+  const lfoGain = c.createGain();
+  osc.type = 'sawtooth';
+  osc.frequency.value = freq;
+  lfo.frequency.value = 6.5;
+  lfoGain.gain.value = freq * 0.007;
+  lfo.connect(lfoGain);
+  lfoGain.connect(osc.frequency);
+  vol.gain.setValueAtTime(0.0001, t);
+  vol.gain.exponentialRampToValueAtTime(gain, t + 0.03);
+  vol.gain.setValueAtTime(gain, t + dur - 0.12);
+  vol.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  osc.connect(vol);
+  vol.connect(c.destination);
+  osc.start(t);
+  osc.stop(t + dur + 0.05);
+  lfo.start(t);
+  lfo.stop(t + dur + 0.05);
+}
+
+// chord plays several tones together.
+function chord(freqs, dur, delay, gain, type) {
+  freqs.forEach((f) => tone(f, dur, delay, gain, type));
+}
+
+const SOUNDS = [
+  // ---------- pass: correct-answer candidates ----------
+  {
+    id: 'A1', group: 'pass', name: '双铃叮叮', tag: '当前版本',
+    desc: '两声上行铃铛「叮！叮！」，清脆明快',
+    dur: 1.2,
+    play() { bell(1568, 0, 0.16); bell(2093, 0.18, 0.13); },
+  },
+  {
+    id: 'A2', group: 'pass', name: '魔法闪光「咻~叮！」',
+    desc: '快速上滑音后接一声高铃，有魔法的惊喜感',
+    dur: 1.3,
+    play() { slide(660, 1760, 0.22, 0, 0.1); bell(2093, 0.22, 0.11); },
+  },
+  {
+    id: 'A3', group: 'pass', name: '游戏金币「叮铃！」',
+    desc: '经典游戏收金币音色，一秒钟的成就感',
+    dur: 0.6,
+    play() {
+      tone(988, 0.08, 0, 0.09, 'square');
+      tone(1319, 0.3, 0.08, 0.09, 'square');
+    },
+  },
+  {
+    id: 'A4', group: 'pass', name: '八音盒琶音',
+    desc: 'do-mi-so-do 四音快速滚奏，像拧发条的音乐盒',
+    dur: 1.2,
+    play() {
+      [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.4, i * 0.08, 0.11));
+    },
+  },
+  {
+    id: 'A5', group: 'pass', name: '泡泡双弹「啵！啵！」',
+    desc: '两个快速上升的泡泡音，软萌可爱',
+    dur: 0.5,
+    play() {
+      slide(400, 900, 0.09, 0, 0.13);
+      slide(500, 1100, 0.09, 0.13, 0.13);
+    },
+  },
+  {
+    id: 'A6', group: 'pass', name: '叮咚门铃',
+    desc: '「叮~咚」两声厚实圆润的钟音，家喻户晓',
+    dur: 0.8,
+    play() {
+      tone(880, 0.2, 0, 0.12);
+      tone(1175, 0.45, 0.2, 0.12);
+    },
+  },
+  {
+    id: 'A7', group: 'pass', name: '滑音双铃「嗖~叮叮」',
+    desc: '短促滑音带出两声铃铛，先扬后悦',
+    dur: 1.3,
+    play() {
+      slide(523, 1047, 0.18, 0, 0.1, 'triangle');
+      bell(1047, 0.18, 0.14);
+      bell(1568, 0.27, 0.1);
+    },
+  },
+  {
+    id: 'A8', group: 'pass', name: '木琴双音「哆~咪~」',
+    desc: '清亮的木琴质感两连音，简单纯粹',
+    dur: 0.7,
+    play() {
+      tone(659, 0.14, 0, 0.13, 'triangle');
+      tone(880, 0.26, 0.14, 0.13, 'triangle');
+    },
+  },
+  // ---------- win: level-complete candidates ----------
+  {
+    id: 'B1', group: 'win', name: '小号号角', tag: '当前版本',
+    desc: '三连音起势 + 长音颤音 + 铃声收尾的完整号角',
+    dur: 1.8,
+    play() {
+      [0, 0.14, 0.28].forEach((d) => tone(523, 0.11, d, 0.1, 'square'));
+      tone(659, 0.11, 0.43, 0.1, 'square');
+      tone(784, 0.11, 0.57, 0.1, 'square');
+      tone(784, 0.55, 0.74, 0.07, 'square');
+      vibrato(1047, 0.74, 0.62, 0.1);
+      bell(1568, 0.8, 0.07);
+      bell(2093, 0.92, 0.06);
+    },
+  },
+  {
+    id: 'B2', group: 'win', name: '冲刺音阶 + 凯旋和弦',
+    desc: '七个音一路狂奔冲上高点，大和弦轰然收尾',
+    dur: 1.6,
+    play() {
+      [523, 587, 659, 698, 784, 880, 988].forEach((f, i) => {
+        tone(f, 0.1, i * 0.06, 0.08, 'square');
+      });
+      chord([1047, 1319, 1568], 0.9, 0.48, 0.06, 'square');
+      tone(523, 0.9, 0.48, 0.09);
+    },
+  },
+  {
+    id: 'B3', group: 'win', name: '胜利 Ta-Da!',
+    desc: '干脆的两个和弦：短促一小一大，像舞台谢幕',
+    dur: 1.3,
+    play() {
+      chord([523, 659, 784], 0.14, 0, 0.09, 'square');
+      chord([1046, 1319, 1568], 1, 0.16, 0.055, 'square');
+      bell(2093, 0.16, 0.07);
+    },
+  },
+  {
+    id: 'B4', group: 'win', name: '冲锋号三连跳',
+    desc: '低到高三声冲锋号 + 高音长号，阅兵式气势',
+    dur: 1.5,
+    play() {
+      tone(392, 0.11, 0, 0.09, 'square');
+      tone(523, 0.11, 0.13, 0.09, 'square');
+      tone(659, 0.11, 0.26, 0.09, 'square');
+      vibrato(784, 0.4, 0.9, 0.1);
+      bell(1568, 0.5, 0.06);
+    },
+  },
+  {
+    id: 'B5', group: 'win', name: '体育狂欢（哨声+撒花铃）',
+    desc: '裁判哨声冲天而起，一串铃声像彩带洒下来',
+    dur: 1.8,
+    play() {
+      slide(600, 1800, 0.3, 0, 0.11);
+      [1568, 1976, 2349, 2637, 2093, 3136].forEach((f, i) => {
+        bell(f, 0.35 + i * 0.09, 0.08);
+      });
+      bell(2637, 0.9, 0.09);
+    },
+  },
+  {
+    id: 'B6', group: 'win', name: '过关小旋律',
+    desc: '经典游戏过关风格的短旋律动机，节奏感强',
+    dur: 1.4,
+    play() {
+      tone(659, 0.1, 0, 0.09, 'square');
+      tone(784, 0.1, 0.12, 0.09, 'square');
+      tone(1319, 0.1, 0.24, 0.09, 'square');
+      tone(1047, 0.1, 0.48, 0.09, 'square');
+      tone(1175, 0.1, 0.6, 0.09, 'square');
+      tone(1568, 0.5, 0.72, 0.09, 'square');
+    },
+  },
+  {
+    id: 'B7', group: 'win', name: '星光大道（加速铃+和弦）',
+    desc: '高低铃交替越敲越快，最后砸出一片星光和弦',
+    dur: 1.6,
+    play() {
+      [0, 0.15, 0.28, 0.39, 0.48, 0.55].forEach((d, i) => {
+        bell(i % 2 === 0 ? 1568 : 2093, d, 0.09);
+      });
+      [1047, 1319, 1568].forEach((f) => bell(f, 0.68, 0.08));
+      bell(3136, 0.68, 0.05);
+    },
+  },
+];
+
+function renderList() {
+  ['pass', 'win'].forEach((group) => {
+    const list = document.getElementById(group + '-list');
+    list.innerHTML = SOUNDS.filter((s) => s.group === group).map((s) => `
+      <div class="card" id="card-${s.id}">
+        <button class="play" onclick="playSound('${s.id}')" aria-label="play ${s.id}">▶</button>
+        <div class="info">
+          <div class="name">${s.id} · ${s.name}${s.tag ? `<span class="tag">${s.tag}</span>` : ''}</div>
+          <div class="desc">${s.desc}</div>
+        </div>
+      </div>`).join('');
+  });
+}
+
+function highlight(id, on) {
+  const card = document.getElementById('card-' + id);
+  if (card) card.classList.toggle('playing', on);
+}
+
+function playSound(id) {
+  const s = SOUNDS.find((x) => x.id === id);
+  if (!s) return;
+  highlight(id, true);
+  setTimeout(() => highlight(id, false), s.dur * 1000);
+  s.play();
+}
+
+let sequencing = false;
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function playGroup(group) {
+  if (sequencing) return;
+  sequencing = true;
+  const btn = document.getElementById(group + '-all');
+  btn.disabled = true;
+  btn.textContent = '⏳ 播放中…';
+  for (const s of SOUNDS.filter((x) => x.group === group)) {
+    highlight(s.id, true);
+    s.play();
+    await sleep((s.dur + 0.5) * 1000);
+    highlight(s.id, false);
+  }
+  btn.disabled = false;
+  btn.textContent = '▶ 依次试听全部';
+  sequencing = false;
+}
+
+renderList();
+</script>
+</body>
+</html>
