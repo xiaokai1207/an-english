@@ -1,0 +1,9 @@
+# macOS
+.DS_Store
+
+# Editor / tooling local state
+.codebuddy/
+.vscode/
+
+# Local-only build copy used for manual EdgeOne uploads
+deploy/
