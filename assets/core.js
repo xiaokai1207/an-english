@@ -328,11 +328,14 @@ const SFX = {
     const ctx = this.ensure();
     if (!ctx) return;
     const render = () => {
-      const lead = ctx.state === 'suspended' ? 0.18 : 0.06;
+      const lead = ctx.state === 'running' ? 0.06 : 0.18;
       const base = ctx.currentTime + lead;
       voices.forEach((voice) => this.renderVoice(ctx, base, voice));
     };
-    if (ctx.state === 'suspended') {
+    // Any non-running state (suspended, or iOS's "interrupted" after the mic
+    // held the audio hardware) must be resumed first, or the freshly closed
+    // recording context leaves this one asleep and the effect is swallowed.
+    if (ctx.state !== 'running') {
       const resumed = ctx.resume();
       if (resumed && resumed.then) {
         resumed.then(render).catch(render);

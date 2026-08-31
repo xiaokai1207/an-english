@@ -479,13 +479,21 @@ const FollowRead = {
     if (result.passed) {
       this.state = 'passed';
       this.render();
-      SFX.correct();
-      confetti();
+      // Play the chime after the mic's AudioContext has finished tearing
+      // down and the pass DOM has painted. Closing the mic context in the
+      // same tick as starting a new sound made the browser drop the first
+      // notes (the "ta-da" arrived as a lone "da"); confetti's DOM burst then
+      // starved the audio scheduler further. Deferring past both keeps every
+      // note intact, then confetti fires once the sound is safely scheduled.
+      setTimeout(() => {
+        SFX.readPass();
+        setTimeout(() => confetti(), 120);
+      }, 60);
       if (this.onPass) this.onPass();
     } else {
       this.state = 'failed';
       this.render();
-      SFX.readFail();
+      setTimeout(() => SFX.readFail(), 60);
     }
   },
 

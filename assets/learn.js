@@ -245,7 +245,7 @@ const Games = {
       this.score += 1;
       U.recordOk(item.word);
       U.addStars(1);
-      SFX.correct();
+      SFX.readPass();
     } else {
       btn.classList.add('wrong');
       U.recordErr(item.word);
@@ -359,7 +359,7 @@ const Games = {
     if (count) count.textContent = `🔗 ${this.matchedCount}/${this.pairs.length}`;
     U.recordOk(word);
     U.addStars(1);
-    SFX.correct();
+    SFX.readPass();
     TTS.speak(word);
     if (this.matchedCount === this.pairs.length) {
       setTimeout(() => this.finishGame(this.matchedCount, this.pairs.length), 650);
