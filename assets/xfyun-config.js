@@ -16,5 +16,5 @@ const XFYUN_ISE_CONFIG = {
 
   // 读对判定门槛（0-100）：达到该分数才算读对、解锁下一个单词。
   // 想更宽松就调低，更严格就调高。
-  passScore: 30,
+  passScore: 10,
 };

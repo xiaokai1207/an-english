@@ -415,12 +415,21 @@ const SFX = {
     lfo.stop(startAt + dur + 0.05);
   },
 
-  // correct is the classic ding-dong: two clear notes rendered together so
-  // both always sound, even on Android where they used to break apart.
+  // correct is an exciting little victory fanfare: a bright rising run of
+  // notes that bursts into a triumphant sustained chord topped with a
+  // sparkling bell - a big, thrilling "you did it!" that gets kids pumped.
   correct() {
     this.play([
-      { freq: 660, duration: 0.16, delay: 0 },
-      { freq: 880, duration: 0.22, delay: 0.14 },
+      // rising run - quick, bright, building anticipation
+      { freq: 784, duration: 0.1, delay: 0, gain: 0.1, type: 'square' },
+      { freq: 988, duration: 0.1, delay: 0.09, gain: 0.1, type: 'square' },
+      { freq: 1175, duration: 0.1, delay: 0.18, gain: 0.1, type: 'square' },
+      // triumphant sustained major chord - the big payoff
+      { kind: 'fanfare', freq: 1568, duration: 0.6, delay: 0.28, gain: 0.09 },
+      { kind: 'fanfare', freq: 1976, duration: 0.6, delay: 0.28, gain: 0.07 },
+      { kind: 'fanfare', freq: 2349, duration: 0.6, delay: 0.28, gain: 0.05 },
+      // sparkling bell on top for that celebratory shimmer
+      { kind: 'bell', freq: 3136, delay: 0.28, gain: 0.08 },
     ]);
   },
 
