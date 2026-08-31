@@ -134,8 +134,9 @@ const Learn = {
     Store.save();
     U.addStars(2);
     SFX.win();
-    confetti();
-    TTS.speak(`Great job! You learned ${this.cards.length} words!`);
+    confetti(60);
+    const cheer = `Woo-hoo! Amazing! You learned ${this.cards.length} new words! You are a superstar!`;
+    TTS.speak(cheer, null, { excited: true });
     U.app().innerHTML = `
       <main class="screen done-screen">
         <div class="done-emoji">🎉</div>
@@ -348,9 +349,9 @@ const Games = {
     log.played = true;
     Store.save();
     SFX.win();
-    confetti();
-    const line = score === total ? 'Perfect! Amazing!' : 'Great job! Well done!';
-    TTS.speak(line);
+    confetti(60);
+    const line = score === total ? 'Woo-hoo! Perfect! You are amazing!' : 'Yay! Great job! Well done!';
+    TTS.speak(line, null, { excited: true });
     U.app().innerHTML = `
       <main class="screen done-screen">
         <div class="done-emoji">🏆</div>

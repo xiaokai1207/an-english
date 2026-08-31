@@ -11,6 +11,16 @@ const ISE_MAX_RECORD_MS = 8000;
 const ISE_RESULT_TIMEOUT_MS = 15000;
 const ISE_DEFAULT_PASS_SCORE = 60;
 
+// Voice-activity thresholds for hands-free auto-submit: once the child has
+// clearly spoken (RMS above SPEAK), a run of quiet frames (below SILENCE)
+// lasting HANG_MS ends the take automatically - no "I'm done" tap needed.
+// A short LEAD_MS grace after the mic opens stops the very first quiet frames
+// from ending the take before the child starts.
+const VAD_SPEAK_RMS = 0.05;
+const VAD_SILENCE_RMS = 0.025;
+const VAD_HANG_MS = 900;
+const VAD_LEAD_MS = 600;
+
 // bytesToBase64 encodes a typed array without overflowing the call stack.
 function bytesToBase64(bytes) {
   let bin = '';
@@ -52,8 +62,9 @@ async function xfyunWssUrl(host, path) {
 }
 
 // Mic captures mono 16 kHz PCM from the microphone and hands each buffer to
-// onFrame as an Int16Array. Echo cancellation keeps the app's own TTS voice
-// from leaking into the recording.
+// onFrame as an Int16Array plus its RMS level (0..1) so callers can detect
+// when the child has finished speaking. Echo cancellation keeps the app's own
+// TTS voice from leaking into the recording.
 const Mic = {
   ctx: null,
   stream: null,
@@ -92,7 +103,7 @@ const Mic = {
     processor.onaudioprocess = (event) => {
       const input = event.inputBuffer.getChannelData(0);
       const samples = mic.ratio === 1 ? input : mic.resample(input);
-      onFrame(mic.encodePcm(samples));
+      onFrame(mic.encodePcm(samples), mic.rms(input));
     };
 
     this.ctx = ctx;
@@ -100,6 +111,13 @@ const Mic = {
     this.source = source;
     this.processor = processor;
     this.mute = mute;
+  },
+
+  // rms measures how loud one input buffer is (0..1) for silence detection.
+  rms(input) {
+    let sum = 0;
+    for (let i = 0; i < input.length; i += 1) sum += input[i] * input[i];
+    return Math.sqrt(sum / input.length);
   },
 
   // makeContext prefers a native 16 kHz context so no resampling is needed.
@@ -359,6 +377,12 @@ const FollowRead = {
   lastReason: '',
   timer: null,
 
+  // VAD bookkeeping for hands-free auto-submit.
+  heardVoice: false,
+  startedAt: 0,
+  silenceMs: 0,
+  lastFrameAt: 0,
+
   configured() {
     return typeof XFYUN_ISE_CONFIG !== 'undefined'
       && !!XFYUN_ISE_CONFIG.appId
@@ -389,23 +413,52 @@ const FollowRead = {
     const session = new IseSession(this.text);
     this.session = session;
     this.state = 'recording';
+    this.heardVoice = false;
+    this.silenceMs = 0;
+    this.startedAt = Date.now();
+    this.lastFrameAt = this.startedAt;
     this.render();
     session.start()
       .then((result) => { if (this.session === session) this.handleResult(result); })
       .catch((err) => { if (this.session === session) this.handleError(err); });
-    Mic.start((pcm) => {
-      if (this.session === session) session.push(pcm);
+    Mic.start((pcm, level) => {
+      if (this.session !== session) return;
+      session.push(pcm);
+      this.watchVoice(level);
     })
       .then(() => {
         if (this.session !== session || this.state !== 'recording') {
           Mic.stop();
           return;
         }
+        // A hard ceiling still ends the take if the child never stops talking.
         this.timer = setTimeout(() => this.done(), ISE_MAX_RECORD_MS);
       })
       .catch((err) => {
         if (this.session === session) this.handleMicError(err);
       });
+  },
+
+  // watchVoice ends the take automatically once the child has spoken and then
+  // gone quiet for a moment - so no manual "I'm done" tap is ever needed.
+  watchVoice(level) {
+    if (this.state !== 'recording') return;
+    const now = Date.now();
+    const gap = now - this.lastFrameAt;
+    this.lastFrameAt = now;
+    if (now - this.startedAt < VAD_LEAD_MS) return;
+    if (level >= VAD_SPEAK_RMS) {
+      this.heardVoice = true;
+      this.silenceMs = 0;
+      return;
+    }
+    if (!this.heardVoice) return;
+    if (level < VAD_SILENCE_RMS) {
+      this.silenceMs += gap;
+      if (this.silenceMs >= VAD_HANG_MS) this.done();
+    } else {
+      this.silenceMs = 0;
+    }
   },
 
   // done stops the mic and asks the service for the score.
@@ -514,8 +567,7 @@ const FollowRead = {
       html = `
         <div class="follow-live">
           <div class="follow-wave">🎤</div>
-          <div class="follow-text">I'm listening…<i>大声读出来吧</i></div>
-          <button class="follow-done" onclick="FollowRead.done()">✅ I'm done!</button>
+          <div class="follow-text">I'm listening…<i>大声读出来，读完自动检测</i></div>
         </div>`;
     } else if (this.state === 'evaluating') {
       html = `

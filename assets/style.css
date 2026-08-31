@@ -573,22 +573,6 @@ button {
   animation: wiggle 1.2s ease-in-out infinite;
 }
 
-.follow-done {
-  background: var(--sky);
-  color: #FFFFFF;
-  font-size: 17px;
-  font-weight: 800;
-  padding: 13px 30px;
-  border-radius: 16px;
-  box-shadow: 0 5px 0 #2FA8CC;
-  transition: transform 0.12s;
-}
-
-.follow-done:active {
-  transform: translateY(4px);
-  box-shadow: none;
-}
-
 .follow-pass {
   width: 100%;
   background: #EDFDF0;

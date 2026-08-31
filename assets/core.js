@@ -140,37 +140,42 @@ const TTS = {
     }
   },
 
-  speak(text, onEnd) {
+  // speak reads English aloud. Pass opts.excited for a higher-pitched,
+  // slightly faster cheer - used on the victory screens so the praise sounds
+  // genuinely thrilled rather than flat.
+  speak(text, onEnd, opts) {
+    const excited = !!(opts && opts.excited);
     if (this.useAudio || !('speechSynthesis' in window)) {
-      this.speakViaAudio(text, onEnd);
+      this.speakViaAudio(text, onEnd, excited);
       return;
     }
     window.speechSynthesis.cancel();
     const u = new SpeechSynthesisUtterance(text);
     if (this.voice) u.voice = this.voice;
     u.lang = this.voice ? this.voice.lang : 'en-US';
-    u.rate = Store.state.settings.rate;
-    u.pitch = 1.05;
+    u.rate = excited ? Math.min(1.15, Store.state.settings.rate + 0.15) : Store.state.settings.rate;
+    u.pitch = excited ? 1.35 : 1.05;
+    u.volume = 1;
     let started = false;
     u.onstart = () => { started = true; };
     u.onend = () => {
       if (this.current !== u) return; // superseded by a newer utterance
       // Ending without ever starting means the engine is mute.
       if (!started) {
-        this.fallback(text, onEnd);
+        this.fallback(text, onEnd, excited);
         return;
       }
       if (onEnd) onEnd();
     };
     u.onerror = () => {
       if (this.current !== u) return;
-      this.fallback(text, onEnd);
+      this.fallback(text, onEnd, excited);
     };
     this.current = u; // keep a reference so iOS does not GC it mid-speech
     window.speechSynthesis.speak(u);
     // Some Android engines never fire any event at all; give them a moment.
     setTimeout(() => {
-      if (!started && this.current === u) this.fallback(text, onEnd);
+      if (!started && this.current === u) this.fallback(text, onEnd, excited);
     }, 3000);
   },
 
@@ -183,18 +188,21 @@ const TTS = {
 
   // fallback switches to the online voice for good once the built-in
   // engine proves broken or silent.
-  fallback(text, onEnd) {
+  fallback(text, onEnd, excited) {
     this.useAudio = true;
     window.speechSynthesis.cancel();
-    this.speakViaAudio(text, onEnd);
+    this.speakViaAudio(text, onEnd, excited);
   },
 
   // speakViaAudio plays an online dictionary voice (US English) through a
   // shared <audio> element. It needs the network but works everywhere,
-  // including Android browsers whose speechSynthesis stays silent.
-  speakViaAudio(text, onEnd) {
+  // including Android browsers whose speechSynthesis stays silent. The online
+  // voice cannot change pitch, so an excited cheer only speeds up a touch.
+  speakViaAudio(text, onEnd, excited) {
     this.playAudio('https://dict.youdao.com/dictvoice?type=2&audio=' + encodeURIComponent(text), onEnd);
-    if (this.audioEl) this.audioEl.playbackRate = Store.state.settings.rate;
+    if (this.audioEl) {
+      this.audioEl.playbackRate = excited ? 1.12 : Store.state.settings.rate;
+    }
   },
 
   // playAudio runs one clip through the shared <audio> element at natural
@@ -282,6 +290,15 @@ const TTS = {
 };
 
 // SFX synthesizes tiny game sounds with Web Audio; no audio files needed.
+//
+// Every effect is described as a list of "voices" (a tone, a bell, or a
+// sustained fanfare note) and rendered through a single play() call. This is
+// the key fix for Android: the whole effect shares ONE base start time that
+// is only computed after the context has actually resumed, so notes with a
+// delay keep their exact relative spacing. The old code called a fresh
+// scheduleBase() per note, and because Android resumes the context
+// asynchronously the base drifted between notes - the first note (the "ding")
+// landed inside the wake-up gap and got swallowed, leaving only the second.
 const SFX = {
   ctx: null,
 
@@ -292,48 +309,68 @@ const SFX = {
       if (!AC) return null;
       this.ctx = new AC();
     }
-    if (this.ctx.state === 'suspended') this.ctx.resume();
     return this.ctx;
   },
 
-  // scheduleBase returns when a newly scheduled voice should start. Android
-  // suspends this context whenever audio focus moves away (the TTS <audio>
-  // element) or the page is hidden; a voice scheduled at the frozen
-  // currentTime lands right inside the wake-up gap and its opening chords
-  // get swallowed. Voices therefore always start slightly in the future -
-  // much further out while a resume is still in flight.
-  scheduleBase() {
-    const lead = this.ctx.state === 'suspended' ? 0.25 : 0.05;
-    return this.ctx.currentTime + lead;
-  },
-
-  tone(freq, duration, delay, gain, type) {
+  // play renders a whole effect. It resumes the context first, then anchors
+  // every voice to one shared base time so an effect always sounds as one
+  // continuous phrase - never a note dropped mid-way. A generous lead keeps
+  // the opening note clear of the Android wake-up gap.
+  play(voices) {
     const ctx = this.ensure();
     if (!ctx) return;
+    const render = () => {
+      const lead = ctx.state === 'suspended' ? 0.18 : 0.06;
+      const base = ctx.currentTime + lead;
+      voices.forEach((voice) => this.renderVoice(ctx, base, voice));
+    };
+    if (ctx.state === 'suspended') {
+      const resumed = ctx.resume();
+      if (resumed && resumed.then) {
+        resumed.then(render).catch(render);
+        return;
+      }
+    }
+    render();
+  },
+
+  // renderVoice draws one voice of an effect at base + its own delay.
+  renderVoice(ctx, base, voice) {
+    if (voice.kind === 'bell') {
+      this.renderBell(ctx, base, voice);
+      return;
+    }
+    if (voice.kind === 'fanfare') {
+      this.renderFanfare(ctx, base, voice);
+      return;
+    }
+    this.renderTone(ctx, base, voice);
+  },
+
+  // renderTone draws a plain oscillator note.
+  renderTone(ctx, base, voice) {
+    const startAt = base + (voice.delay || 0);
     const osc = ctx.createOscillator();
     const vol = ctx.createGain();
-    const startAt = this.scheduleBase() + (delay || 0);
-    osc.type = type || 'sine';
-    osc.frequency.value = freq;
+    osc.type = voice.type || 'sine';
+    osc.frequency.value = voice.freq;
     vol.gain.setValueAtTime(0.0001, startAt);
-    vol.gain.exponentialRampToValueAtTime(gain || 0.12, startAt + 0.02);
-    vol.gain.exponentialRampToValueAtTime(0.0001, startAt + duration);
+    vol.gain.exponentialRampToValueAtTime(voice.gain || 0.12, startAt + 0.02);
+    vol.gain.exponentialRampToValueAtTime(0.0001, startAt + voice.duration);
     osc.connect(vol);
     vol.connect(ctx.destination);
     osc.start(startAt);
-    osc.stop(startAt + duration + 0.05);
+    osc.stop(startAt + voice.duration + 0.05);
   },
 
-  // bell rings a bell-like ding: a fundamental plus inharmonic partials,
-  // each fading at its own speed - synthesized, no audio file needed.
-  bell(freq, delay, gain) {
-    const ctx = this.ensure();
-    if (!ctx) return;
-    const startAt = this.scheduleBase() + (delay || 0);
+  // renderBell rings a bell-like ding: a fundamental plus inharmonic
+  // partials, each fading at its own speed.
+  renderBell(ctx, base, voice) {
+    const startAt = base + (voice.delay || 0);
     const partials = [
-      [freq, 1, 1],
-      [freq * 2, 0.4, 0.55],
-      [freq * 2.76, 0.22, 0.35],
+      [voice.freq, 1, 1],
+      [voice.freq * 2, 0.4, 0.55],
+      [voice.freq * 2.76, 0.22, 0.35],
     ];
     partials.forEach(([f, g, decay]) => {
       const osc = ctx.createOscillator();
@@ -341,7 +378,7 @@ const SFX = {
       osc.type = 'sine';
       osc.frequency.value = f;
       vol.gain.setValueAtTime(0.0001, startAt);
-      vol.gain.exponentialRampToValueAtTime((gain || 0.14) * g, startAt + 0.012);
+      vol.gain.exponentialRampToValueAtTime((voice.gain || 0.14) * g, startAt + 0.012);
       vol.gain.exponentialRampToValueAtTime(0.0001, startAt + decay);
       osc.connect(vol);
       vol.connect(ctx.destination);
@@ -350,25 +387,25 @@ const SFX = {
     });
   },
 
-  // fanfareNote holds one brassy sawtooth note with vibrato - the triumphant
-  // long note at the end of a fanfare.
-  fanfareNote(freq, delay, dur) {
-    const ctx = this.ensure();
-    if (!ctx) return;
-    const startAt = this.scheduleBase() + delay;
+  // renderFanfare holds one brassy sawtooth note with vibrato - the
+  // triumphant long note at the end of a fanfare.
+  renderFanfare(ctx, base, voice) {
+    const startAt = base + (voice.delay || 0);
+    const dur = voice.duration;
     const osc = ctx.createOscillator();
     const vol = ctx.createGain();
     const lfo = ctx.createOscillator();
     const lfoGain = ctx.createGain();
     osc.type = 'sawtooth';
-    osc.frequency.value = freq;
+    osc.frequency.value = voice.freq;
     lfo.frequency.value = 6.5;
-    lfoGain.gain.value = freq * 0.007;
+    lfoGain.gain.value = voice.freq * 0.008;
     lfo.connect(lfoGain);
     lfoGain.connect(osc.frequency);
+    const peak = voice.gain || 0.12;
     vol.gain.setValueAtTime(0.0001, startAt);
-    vol.gain.exponentialRampToValueAtTime(0.1, startAt + 0.03);
-    vol.gain.setValueAtTime(0.1, startAt + dur - 0.1);
+    vol.gain.exponentialRampToValueAtTime(peak, startAt + 0.03);
+    vol.gain.setValueAtTime(peak, startAt + dur - 0.1);
     vol.gain.exponentialRampToValueAtTime(0.0001, startAt + dur);
     osc.connect(vol);
     vol.connect(ctx.destination);
@@ -378,50 +415,75 @@ const SFX = {
     lfo.stop(startAt + dur + 0.05);
   },
 
+  // correct is the classic ding-dong: two clear notes rendered together so
+  // both always sound, even on Android where they used to break apart.
   correct() {
-    this.tone(660, 0.14, 0);
-    this.tone(880, 0.18, 0.12);
+    this.play([
+      { freq: 660, duration: 0.16, delay: 0 },
+      { freq: 880, duration: 0.22, delay: 0.14 },
+    ]);
   },
 
   wrong() {
-    this.tone(196, 0.22, 0, 0.07);
+    this.play([{ freq: 196, duration: 0.22, delay: 0, gain: 0.07 }]);
   },
 
   // readPass is a punchy ta-da: a small chord answered by a big sustained
-  // chord with a bell on top - an instant "you got it!" moment.
+  // chord with a bell on top - an instant "you got it!" moment. It doubles
+  // as the correct-answer sound for Listen & Tap.
   readPass() {
-    [523, 659, 784].forEach((f) => this.tone(f, 0.14, 0, 0.09, 'square'));
-    [1046, 1319, 1568].forEach((f) => this.tone(f, 1, 0.16, 0.055, 'square'));
-    this.bell(2093, 0.16, 0.07);
+    const voices = [
+      { freq: 523, duration: 0.14, delay: 0, gain: 0.09, type: 'square' },
+      { freq: 659, duration: 0.14, delay: 0, gain: 0.09, type: 'square' },
+      { freq: 784, duration: 0.14, delay: 0, gain: 0.09, type: 'square' },
+      { freq: 1046, duration: 1, delay: 0.16, gain: 0.055, type: 'square' },
+      { freq: 1319, duration: 1, delay: 0.16, gain: 0.055, type: 'square' },
+      { freq: 1568, duration: 1, delay: 0.16, gain: 0.055, type: 'square' },
+      { kind: 'bell', freq: 2093, delay: 0.16, gain: 0.07 },
+    ];
+    this.play(voices);
   },
 
   // readFail is an urgent two-tone alarm, strong like a little warning siren
   // but short enough that it never scares anyone.
   readFail() {
-    this.tone(784, 0.12, 0, 0.09, 'square');
-    this.tone(523, 0.12, 0.15, 0.09, 'square');
-    this.tone(784, 0.12, 0.3, 0.09, 'square');
-    this.tone(523, 0.16, 0.45, 0.09, 'square');
+    this.play([
+      { freq: 784, duration: 0.12, delay: 0, gain: 0.09, type: 'square' },
+      { freq: 523, duration: 0.12, delay: 0.15, gain: 0.09, type: 'square' },
+      { freq: 784, duration: 0.12, delay: 0.3, gain: 0.09, type: 'square' },
+      { freq: 523, duration: 0.16, delay: 0.45, gain: 0.09, type: 'square' },
+    ]);
   },
 
   star() {
-    this.tone(880, 0.1, 0);
-    this.tone(1109, 0.1, 0.1);
-    this.tone(1319, 0.22, 0.2);
+    this.play([
+      { freq: 880, duration: 0.1, delay: 0 },
+      { freq: 1109, duration: 0.1, delay: 0.1 },
+      { freq: 1319, duration: 0.22, delay: 0.2 },
+    ]);
   },
 
-  // win is a cavalry charge: three rising bugle calls, then a long vibrato
-  // note holding the high ground, capped with a bell.
+  // win is a big, rousing victory fanfare: a rising bugle run, a triumphant
+  // major chord stab, then two long brassy notes climbing to a high hold,
+  // sparkling bells on top - the kind of blast that makes a kid cheer.
   win() {
-    this.tone(392, 0.11, 0, 0.09, 'square');
-    this.tone(523, 0.11, 0.13, 0.09, 'square');
-    this.tone(659, 0.11, 0.26, 0.09, 'square');
-    this.fanfareNote(784, 0.4, 0.9);
-    this.bell(1568, 0.5, 0.06);
+    this.play([
+      { freq: 523, duration: 0.12, delay: 0, gain: 0.11, type: 'square' },
+      { freq: 659, duration: 0.12, delay: 0.12, gain: 0.11, type: 'square' },
+      { freq: 784, duration: 0.12, delay: 0.24, gain: 0.11, type: 'square' },
+      { freq: 1046, duration: 0.16, delay: 0.36, gain: 0.12, type: 'square' },
+      { freq: 523, duration: 0.24, delay: 0.52, gain: 0.09, type: 'square' },
+      { freq: 659, duration: 0.24, delay: 0.52, gain: 0.09, type: 'square' },
+      { freq: 784, duration: 0.24, delay: 0.52, gain: 0.09, type: 'square' },
+      { kind: 'fanfare', freq: 784, duration: 0.5, delay: 0.78, gain: 0.12 },
+      { kind: 'fanfare', freq: 1046, duration: 1.1, delay: 1.24, gain: 0.13 },
+      { kind: 'bell', freq: 1568, delay: 0.78, gain: 0.07 },
+      { kind: 'bell', freq: 2093, delay: 1.24, gain: 0.08 },
+    ]);
   },
 
   flip() {
-    this.tone(520, 0.06, 0, 0.06);
+    this.play([{ freq: 520, duration: 0.06, delay: 0, gain: 0.06 }]);
   },
 };
 
