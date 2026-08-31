@@ -8,6 +8,9 @@ const DEFAULT_STATE = {
   streak: { last: null, days: 0 },
   words: {},
   dailyLog: {},
+  // abc tracks the ABC section (letters, phonics, sight words) as simple
+  // done-counts, kept separate from the themed word progress in `words`.
+  abc: { letters: {}, phonics: {}, sight: {} },
   settings: {
     newPerDay: 6,
     reviewPerDay: 4,
@@ -42,6 +45,11 @@ const Store = {
     this.state.streak = Object.assign({}, DEFAULT_STATE.streak, this.state.streak);
     this.state.words = this.state.words || {};
     this.state.dailyLog = this.state.dailyLog || {};
+    // deep-merge abc so an older save without it still gets every bucket
+    this.state.abc = Object.assign({}, DEFAULT_STATE.abc, this.state.abc || {});
+    this.state.abc.letters = this.state.abc.letters || {};
+    this.state.abc.phonics = this.state.abc.phonics || {};
+    this.state.abc.sight = this.state.abc.sight || {};
     return this.state;
   },
 

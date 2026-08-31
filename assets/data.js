@@ -506,3 +506,164 @@ const LEARNING_DATA = {
     },
   ],
 };
+
+// ABC_DATA powers the ABC section: letter recognition, phonics, and sight
+// words. It lives outside LEARNING_DATA because these skills are practised
+// across the whole plan rather than tied to any single week.
+const ABC_DATA = {
+  // letters: the 26 capitals, each with its example word and picture, used
+  // for letter recognition and the "which letter?" game.
+  letters: [
+    { letter: 'A', word: 'apple', zh: '苹果', emoji: '🍎' },
+    { letter: 'B', word: 'ball', zh: '球', emoji: '⚽' },
+    { letter: 'C', word: 'cat', zh: '猫', emoji: '🐱' },
+    { letter: 'D', word: 'dog', zh: '狗', emoji: '🐶' },
+    { letter: 'E', word: 'egg', zh: '鸡蛋', emoji: '🥚' },
+    { letter: 'F', word: 'fish', zh: '鱼', emoji: '🐟' },
+    { letter: 'G', word: 'grapes', zh: '葡萄', emoji: '🍇' },
+    { letter: 'H', word: 'hat', zh: '帽子', emoji: '🎩' },
+    { letter: 'I', word: 'ice cream', zh: '冰淇淋', emoji: '🍦' },
+    { letter: 'J', word: 'juice', zh: '果汁', emoji: '🧃' },
+    { letter: 'K', word: 'kite', zh: '风筝', emoji: '🪁' },
+    { letter: 'L', word: 'lion', zh: '狮子', emoji: '🦁' },
+    { letter: 'M', word: 'moon', zh: '月亮', emoji: '🌙' },
+    { letter: 'N', word: 'nose', zh: '鼻子', emoji: '👃' },
+    { letter: 'O', word: 'orange', zh: '橙子', emoji: '🍊' },
+    { letter: 'P', word: 'pig', zh: '猪', emoji: '🐷' },
+    { letter: 'Q', word: 'queen', zh: '女王', emoji: '👸' },
+    { letter: 'R', word: 'rabbit', zh: '兔子', emoji: '🐰' },
+    { letter: 'S', word: 'sun', zh: '太阳', emoji: '☀️' },
+    { letter: 'T', word: 'tiger', zh: '老虎', emoji: '🐯' },
+    { letter: 'U', word: 'umbrella', zh: '雨伞', emoji: '☂️' },
+    { letter: 'V', word: 'van', zh: '货车', emoji: '🚐' },
+    { letter: 'W', word: 'water', zh: '水', emoji: '💧' },
+    { letter: 'X', word: 'fox', zh: '狐狸', emoji: '🦊' },
+    { letter: 'Y', word: 'yellow', zh: '黄色', emoji: '💛' },
+    { letter: 'Z', word: 'zebra', zh: '斑马', emoji: '🦓' },
+  ],
+
+  // phonics: CVC word families grouped by short vowel, plus consonant
+  // digraphs. Each family teaches the sound then blends simple words so the
+  // child hears c-a-t -> cat. parts are the sounded-out chunks.
+  phonics: [
+    {
+      id: 'short-a',
+      title: 'Short A',
+      titleZh: '短元音 A',
+      sound: 'a',
+      emoji: '🅰️',
+      words: [
+        { word: 'cat', zh: '猫', emoji: '🐱', parts: ['c', 'a', 't'] },
+        { word: 'hat', zh: '帽子', emoji: '🎩', parts: ['h', 'a', 't'] },
+        { word: 'bat', zh: '蝙蝠', emoji: '🦇', parts: ['b', 'a', 't'] },
+        { word: 'map', zh: '地图', emoji: '🗺️', parts: ['m', 'a', 'p'] },
+        { word: 'can', zh: '罐头', emoji: '🥫', parts: ['c', 'a', 'n'] },
+        { word: 'fan', zh: '扇子', emoji: '🪭', parts: ['f', 'a', 'n'] },
+      ],
+    },
+    {
+      id: 'short-e',
+      title: 'Short E',
+      titleZh: '短元音 E',
+      sound: 'e',
+      emoji: '🇪',
+      words: [
+        { word: 'bed', zh: '床', emoji: '🛏️', parts: ['b', 'e', 'd'] },
+        { word: 'red', zh: '红色', emoji: '🟥', parts: ['r', 'e', 'd'] },
+        { word: 'pen', zh: '钢笔', emoji: '🖊️', parts: ['p', 'e', 'n'] },
+        { word: 'ten', zh: '十', emoji: '🔟', parts: ['t', 'e', 'n'] },
+        { word: 'net', zh: '网', emoji: '🥅', parts: ['n', 'e', 't'] },
+        { word: 'jet', zh: '喷气机', emoji: '✈️', parts: ['j', 'e', 't'] },
+      ],
+    },
+    {
+      id: 'short-i',
+      title: 'Short I',
+      titleZh: '短元音 I',
+      sound: 'i',
+      emoji: '🇮',
+      words: [
+        { word: 'pig', zh: '猪', emoji: '🐷', parts: ['p', 'i', 'g'] },
+        { word: 'big', zh: '大的', emoji: '🐘', parts: ['b', 'i', 'g'] },
+        { word: 'sit', zh: '坐', emoji: '🪑', parts: ['s', 'i', 't'] },
+        { word: 'pin', zh: '别针', emoji: '📌', parts: ['p', 'i', 'n'] },
+        { word: 'zip', zh: '拉链', emoji: '🤐', parts: ['z', 'i', 'p'] },
+        { word: 'lip', zh: '嘴唇', emoji: '👄', parts: ['l', 'i', 'p'] },
+      ],
+    },
+    {
+      id: 'short-o',
+      title: 'Short O',
+      titleZh: '短元音 O',
+      sound: 'o',
+      emoji: '🅾️',
+      words: [
+        { word: 'dog', zh: '狗', emoji: '🐶', parts: ['d', 'o', 'g'] },
+        { word: 'log', zh: '木头', emoji: '🪵', parts: ['l', 'o', 'g'] },
+        { word: 'hot', zh: '热的', emoji: '🔥', parts: ['h', 'o', 't'] },
+        { word: 'pot', zh: '锅', emoji: '🍲', parts: ['p', 'o', 't'] },
+        { word: 'top', zh: '陀螺', emoji: '🔝', parts: ['t', 'o', 'p'] },
+        { word: 'box', zh: '盒子', emoji: '📦', parts: ['b', 'o', 'x'] },
+      ],
+    },
+    {
+      id: 'short-u',
+      title: 'Short U',
+      titleZh: '短元音 U',
+      sound: 'u',
+      emoji: '🇺',
+      words: [
+        { word: 'cup', zh: '杯子', emoji: '🥤', parts: ['c', 'u', 'p'] },
+        { word: 'sun', zh: '太阳', emoji: '☀️', parts: ['s', 'u', 'n'] },
+        { word: 'bus', zh: '公交车', emoji: '🚌', parts: ['b', 'u', 's'] },
+        { word: 'run', zh: '跑', emoji: '🏃', parts: ['r', 'u', 'n'] },
+        { word: 'bug', zh: '虫子', emoji: '🐛', parts: ['b', 'u', 'g'] },
+        { word: 'hug', zh: '拥抱', emoji: '🤗', parts: ['h', 'u', 'g'] },
+      ],
+    },
+    {
+      id: 'digraph',
+      title: 'Sounds ch sh th',
+      titleZh: '字母组合 ch/sh/th',
+      sound: 'sh',
+      emoji: '🔤',
+      words: [
+        { word: 'ship', zh: '轮船', emoji: '🚢', parts: ['sh', 'i', 'p'] },
+        { word: 'fish', zh: '鱼', emoji: '🐟', parts: ['f', 'i', 'sh'] },
+        { word: 'shop', zh: '商店', emoji: '🏪', parts: ['sh', 'o', 'p'] },
+        { word: 'chip', zh: '薯片', emoji: '🍟', parts: ['ch', 'i', 'p'] },
+        { word: 'chin', zh: '下巴', emoji: '😊', parts: ['ch', 'i', 'n'] },
+        { word: 'this', zh: '这个', emoji: '👉', parts: ['th', 'i', 's'] },
+      ],
+    },
+  ],
+
+  // sightWords: high-frequency words that cannot be sounded out, split into
+  // small batches so a child meets only a handful at a time.
+  sightWords: [
+    {
+      id: 'batch-1',
+      title: 'Sight Words 1',
+      titleZh: '高频词 第一组',
+      words: ['the', 'a', 'is', 'it', 'in', 'on', 'to', 'and', 'he', 'she'],
+    },
+    {
+      id: 'batch-2',
+      title: 'Sight Words 2',
+      titleZh: '高频词 第二组',
+      words: ['was', 'for', 'are', 'with', 'his', 'they', 'at', 'be', 'this', 'have'],
+    },
+    {
+      id: 'batch-3',
+      title: 'Sight Words 3',
+      titleZh: '高频词 第三组',
+      words: ['from', 'or', 'one', 'had', 'by', 'but', 'not', 'what', 'all', 'we'],
+    },
+    {
+      id: 'batch-4',
+      title: 'Sight Words 4',
+      titleZh: '高频词 第四组',
+      words: ['can', 'said', 'there', 'do', 'how', 'if', 'will', 'up', 'out', 'my'],
+    },
+  ],
+};

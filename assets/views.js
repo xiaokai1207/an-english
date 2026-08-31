@@ -3,6 +3,7 @@
 const NAV_ITEMS = [
   { id: 'today', icon: '🏠', label: 'Home' },
   { id: 'learn', icon: '📖', label: 'Learn' },
+  { id: 'abc', icon: '🔤', label: 'ABC' },
   { id: 'play', icon: '🎮', label: 'Play' },
   { id: 'words', icon: '📚', label: 'Words' },
   { id: 'parents', icon: '🔒', label: 'Grown-ups' },
@@ -26,6 +27,8 @@ function render() {
   const app = U.app();
   if (hash === 'learn') {
     Learn.start();
+  } else if (hash === 'abc') {
+    ABC.menu();
   } else if (hash === 'play') {
     Games.menu();
   } else if (hash === 'words') {
@@ -92,8 +95,8 @@ const Views = {
             <span class="task-icon">📚</span><span class="task-label">My Words</span>
             <span class="task-mark"></span>
           </button>
-          <button class="task" onclick="U.poke()">
-            <span class="task-icon">🎤</span><span class="task-label">Say Hi</span>
+          <button class="task" onclick="nav('abc')">
+            <span class="task-icon">🔤</span><span class="task-label">ABC</span>
             <span class="task-mark"></span>
           </button>
         </div>
@@ -263,6 +266,7 @@ const Views = {
     const goal = U.allUniqueWords().length;
     const mastered = U.allUniqueWords().filter((w) => U.mastery(w.word) === 3).length;
     const pct = Math.round((total / goal) * 100);
+    const abc = ABC.counts();
     const rows = U.allWeeks().map((wk) => {
       const learned = U.learnedCountInWeek(wk.week);
       const pctW = wk.words.length ? Math.round((learned / wk.words.length) * 100) : 0;
@@ -284,6 +288,14 @@ const Views = {
         </div>
         <div class="progress-outer"><div class="progress-inner" style="width:${pct}%"></div></div>
         <div class="progress-zh">词汇目标 ${goal} 词 · 已完成 ${pct}%（阶段目标 300-400）</div>
+      </div>
+      <div class="pcard">
+        <div class="pcard-title">ABC 基础能力 · 字母 / 拼读 / 高频词</div>
+        <div class="stat-row">
+          <div class="stat"><div class="stat-num">${abc.letters}/26</div><div class="stat-zh">字母认读</div></div>
+          <div class="stat"><div class="stat-num">${abc.phonics}/${ABC_DATA.phonics.length}</div><div class="stat-zh">自然拼读</div></div>
+          <div class="stat"><div class="stat-num">${abc.sight}/${ABC_DATA.sightWords.length}</div><div class="stat-zh">高频词组</div></div>
+        </div>
       </div>
       <div class="pcard">
         <div class="pcard-title">每周完成度</div>

@@ -860,34 +860,69 @@ button {
   animation: shake 0.4s;
 }
 
-/* ---------- memory game ---------- */
+/* ---------- match up game ---------- */
 
-.memory-grid {
+.match-hint {
   width: 100%;
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  text-align: center;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--ink);
+  margin-bottom: 4px;
 }
 
-.mem-card {
+.match-hint i {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  font-style: normal;
+  color: var(--dim);
+  margin-top: 4px;
+}
+
+.match-board {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-auto-rows: 1fr;
+  gap: 14px;
+  align-items: stretch;
+}
+
+.match-card {
   background: var(--card);
   border-radius: 20px;
   box-shadow: var(--shadow);
-  min-height: 118px;
+  height: 100%;
+  min-height: 92px;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 10px;
-  transition: transform 0.15s;
+  border: 3px solid transparent;
+  transition: transform 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
 
-.mem-card:active {
+.match-card:active {
   transform: scale(0.95);
 }
 
-.mem-back {
-  font-size: 44px;
-  opacity: 0.85;
+.match-card.active {
+  border-color: var(--sky);
+  box-shadow: 0 0 0 4px rgba(76, 201, 240, 0.25), var(--shadow);
+  transform: scale(1.03);
+}
+
+.match-card.matched {
+  background: #EDFDF0;
+  border-color: var(--green);
+  opacity: 0.9;
+  animation: bounce 0.5s;
+}
+
+.match-card.wrong {
+  border-color: var(--coral);
+  animation: shake 0.4s;
 }
 
 .mem-face .face-emoji {
@@ -904,12 +939,6 @@ button {
   font-size: clamp(20px, 6.5vw, 26px);
   font-weight: 800;
   text-align: center;
-}
-
-.mem-card.matched {
-  background: #EDFDF0;
-  border: 3px solid var(--green);
-  animation: bounce 0.5s;
 }
 
 /* ---------- words book ---------- */
@@ -1402,4 +1431,245 @@ button {
   to {
     transform: translateY(110vh) rotate(720deg);
   }
+}
+
+/* ---------- ABC section ---------- */
+
+.abc-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.abc-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 22px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.abc-card:active {
+  transform: scale(0.96);
+}
+
+.abc-icon {
+  font-size: 46px;
+}
+
+.abc-name {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.abc-zh {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--dim);
+}
+
+/* letter card */
+
+.letter-card {
+  width: 100%;
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 28px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.letter-card:active {
+  transform: scale(0.97);
+}
+
+.letter-big {
+  font-size: clamp(90px, 34vw, 140px);
+  font-weight: 900;
+  color: var(--primary-deep);
+  line-height: 1;
+}
+
+.letter-big small {
+  font-size: 0.5em;
+  color: var(--sky);
+  margin-left: 6px;
+}
+
+.letter-word {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.letter-word .face-emoji {
+  font-size: 40px;
+}
+
+/* letter quiz */
+
+.quiz-ask {
+  width: 100%;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.quiz-ask i {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--dim);
+  font-style: normal;
+  margin-top: 4px;
+}
+
+.letter-opts {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.letter-opt {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 26px 0;
+  font-size: 52px;
+  font-weight: 900;
+  color: var(--ink);
+}
+
+.letter-opt:active {
+  transform: scale(0.95);
+}
+
+.letter-opt.correct {
+  border: 4px solid var(--green);
+  animation: bounce 0.5s;
+}
+
+.letter-opt.wrong {
+  border: 4px solid var(--coral);
+  animation: shake 0.4s;
+}
+
+/* phonics */
+
+.phonics-title {
+  width: 100%;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--dim);
+}
+
+.sound-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.sound-chip {
+  background: var(--sky);
+  color: #fff;
+  border-radius: 16px;
+  min-width: 52px;
+  padding: 14px 16px;
+  font-size: 28px;
+  font-weight: 900;
+  box-shadow: var(--shadow);
+}
+
+.sound-chip:active {
+  transform: scale(0.94);
+}
+
+.sound-plus {
+  font-size: 22px;
+  font-weight: 900;
+  color: var(--dim);
+}
+
+.blend-btn {
+  background: var(--primary);
+  color: #5C4300;
+  border-radius: 20px;
+  padding: 16px 26px;
+  font-size: 26px;
+  font-weight: 900;
+  box-shadow: 0 5px 0 var(--primary-deep);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.blend-btn i {
+  font-size: 13px;
+  font-weight: 700;
+  font-style: normal;
+  color: #7A5B00;
+}
+
+.blend-btn:active {
+  transform: translateY(4px);
+  box-shadow: none;
+}
+
+/* sight words + sentences */
+
+.sight-card,
+.sentence-card {
+  width: 100%;
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 34px 18px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.sight-card:active,
+.sentence-card:active {
+  transform: scale(0.97);
+}
+
+.sight-word {
+  font-size: clamp(52px, 20vw, 84px);
+  font-weight: 900;
+  color: var(--purple);
+  line-height: 1.1;
+}
+
+.sentence-text {
+  font-size: clamp(26px, 8vw, 38px);
+  font-weight: 800;
+  color: var(--ink);
+  text-align: center;
+  line-height: 1.25;
+}
+
+.sentence-zh {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--dim);
+  text-align: center;
 }

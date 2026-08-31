@@ -135,8 +135,6 @@ const Learn = {
     U.addStars(2);
     SFX.win();
     confetti(60);
-    const cheer = `Woo-hoo! Amazing! You learned ${this.cards.length} new words! You are a superstar!`;
-    TTS.speak(cheer, null, { excited: true });
     U.app().innerHTML = `
       <main class="screen done-screen">
         <div class="done-emoji">🎉</div>
@@ -175,9 +173,9 @@ const Games = {
             <span class="game-icon">👂</span><span class="game-name">Listen & Tap</span>
             <span class="game-zh">听音选图</span>
           </button>
-          <button class="game-card" onclick="Games.memoryStart()">
-            <span class="game-icon">🃏</span><span class="game-name">Memory Match</span>
-            <span class="game-zh">翻牌配对</span>
+          <button class="game-card" onclick="Games.matchStart()">
+            <span class="game-icon">🔗</span><span class="game-name">Match Up</span>
+            <span class="game-zh">连连配对</span>
           </button>
         </div>`;
     U.app().innerHTML = `
@@ -268,80 +266,129 @@ const Games = {
     }, 1100);
   },
 
-  // ---- Memory Match ----
+  // ---- Match Up ----
+  // An open-board matching game: pictures on the left, words on the right,
+  // both shuffled. The child taps a picture, then taps the word that matches.
+  // Clearing every pair wins the round - nothing is hidden. Taps only toggle
+  // classes on the affected cards, so the board never re-renders or reflows.
 
-  memoryStart() {
-    const picks = this.pickPool(3);
+  matchStart() {
+    const picks = this.pickPool(4);
     if (picks.length < 3) {
       this.menu();
       return;
     }
-    const deck = [];
-    picks.forEach((w, i) => {
-      deck.push({ key: i, kind: 'emoji', item: w });
-      deck.push({ key: i, kind: 'word', item: w });
-    });
-    this.deck = U.shuffle(deck);
-    this.open = [];
-    this.matched = 0;
-    this.tries = 0;
-    this.memoryRender();
+    this.pairs = picks;
+    this.lefts = U.shuffle(picks);
+    this.rights = U.shuffle(picks);
+    this.pickedLeft = null;
+    this.matched = {};
+    this.matchedCount = 0;
+    this.locked = false;
+    this.matchRender();
   },
 
-  memoryRender() {
-    const cards = this.deck.map((c, i) => {
-      const open = this.open.includes(i);
-      const done = c.done;
-      const inner = open || done
-        ? (c.kind === 'emoji'
-          ? `<span class="mem-face">${U.face(c.item)}</span>`
-          : `<span class="mem-word">${U.esc(c.item.word)}</span>`)
-        : '<span class="mem-back">🐥</span>';
-      return `<button class="mem-card ${open || done ? 'flipped' : ''} ${done ? 'matched' : ''}"
-        onclick="Games.memoryFlip(${i})">${inner}</button>`;
-    }).join('');
+  // matchRender builds the board once. Every tap after this only toggles
+  // classes on individual cards - see matchPickLeft / matchPickRight.
+  // Cards are laid out row by row (picture, word) in one grid so each row's
+  // two cards always share the same height.
+  matchRender() {
+    const total = this.pairs.length;
+    let cells = '';
+    for (let row = 0; row < total; row += 1) {
+      const left = this.lefts[row];
+      const right = this.rights[row];
+      cells += `<button class="match-card" id="ml-${row}"
+        onclick="Games.matchPickLeft(${row})">
+        <span class="mem-face">${U.face(left)}</span></button>`;
+      cells += `<button class="match-card" id="mr-${row}"
+        onclick="Games.matchPickRight(${row})">
+        <span class="mem-word">${U.esc(right.word)}</span></button>`;
+    }
 
     U.app().innerHTML = `
       <header class="topbar">
         <button class="chip btn-back" onclick="Games.menu()">✖️</button>
-        <div class="chip">🃏 ${this.matched}/3</div>
+        <div class="chip" id="match-count">🔗 ${this.matchedCount}/${total}</div>
         <div class="chip">⭐ ${Store.state.stars}</div>
       </header>
       <main class="screen">
-        <div class="memory-grid">${cards}</div>
+        <div class="match-hint">Tap a picture, then its word!<i>先点图片，再点对应的单词</i></div>
+        <div class="match-board">${cells}</div>
       </main>`;
   },
 
-  memoryFlip(i) {
-    if (this.open.includes(i) || this.deck[i].done || this.open.length >= 2) return;
-    this.open.push(i);
-    SFX.flip();
-    this.memoryRender();
-
-    if (this.open.length === 2) {
-      this.tries += 1;
-      const [a, b] = this.open;
-      if (this.deck[a].key === this.deck[b].key) {
-        this.deck[a].done = true;
-        this.deck[b].done = true;
-        this.matched += 1;
-        U.recordOk(this.deck[a].item.word);
-        U.addStars(1);
-        SFX.correct();
-        TTS.speak(this.deck[a].item.word);
-        this.open = [];
-        setTimeout(() => {
-          this.memoryRender();
-          if (this.matched === 3) this.finishGame(3, 3);
-        }, 650);
-      } else {
-        U.recordErr(this.deck[a].item.word);
-        setTimeout(() => {
-          this.open = [];
-          this.memoryRender();
-        }, 900);
-      }
+  matchPickLeft(i) {
+    const w = this.lefts[i];
+    if (this.locked || this.matched[w.word]) return;
+    // clear any previous highlight, then toggle this one
+    const prev = this.lefts.findIndex((l) => l.word === this.pickedLeft);
+    if (prev >= 0) this.setCardState(`ml-${prev}`, '');
+    if (this.pickedLeft === w.word) {
+      this.pickedLeft = null;
+    } else {
+      this.pickedLeft = w.word;
+      this.setCardState(`ml-${i}`, 'active');
     }
+    SFX.flip();
+  },
+
+  matchPickRight(i) {
+    const w = this.rights[i];
+    if (this.locked || this.matched[w.word]) return;
+    if (!this.pickedLeft) {
+      SFX.flip();
+      return;
+    }
+    if (this.pickedLeft === w.word) {
+      this.acceptMatch(w.word, i);
+      return;
+    }
+    this.rejectMatch(i);
+  },
+
+  // acceptMatch locks the paired cards green and updates the counter only.
+  acceptMatch(word, rightIdx) {
+    const leftIdx = this.lefts.findIndex((l) => l.word === word);
+    this.matched[word] = true;
+    this.matchedCount += 1;
+    this.pickedLeft = null;
+    this.setCardState(`ml-${leftIdx}`, 'matched', true);
+    this.setCardState(`mr-${rightIdx}`, 'matched', true);
+    const count = U.el('match-count');
+    if (count) count.textContent = `🔗 ${this.matchedCount}/${this.pairs.length}`;
+    U.recordOk(word);
+    U.addStars(1);
+    SFX.correct();
+    TTS.speak(word);
+    if (this.matchedCount === this.pairs.length) {
+      setTimeout(() => this.finishGame(this.matchedCount, this.pairs.length), 650);
+    }
+  },
+
+  // rejectMatch shakes the wrong word, then clears the left highlight.
+  rejectMatch(rightIdx) {
+    this.locked = true;
+    U.recordErr(this.pickedLeft);
+    SFX.wrong();
+    this.setCardState(`mr-${rightIdx}`, 'wrong');
+    setTimeout(() => {
+      const leftIdx = this.lefts.findIndex((l) => l.word === this.pickedLeft);
+      if (leftIdx >= 0) this.setCardState(`ml-${leftIdx}`, '');
+      this.setCardState(`mr-${rightIdx}`, '');
+      this.pickedLeft = null;
+      this.locked = false;
+    }, 700);
+  },
+
+  // setCardState swaps a card's status class in place (no re-render), and
+  // optionally disables it once matched.
+  setCardState(id, state, disable) {
+    const btn = U.el(id);
+    if (!btn) return;
+    btn.classList.remove('active', 'matched', 'wrong');
+    if (state) btn.classList.add(state);
+    if (disable) btn.disabled = true;
   },
 
   finishGame(score, total) {
@@ -350,8 +397,6 @@ const Games = {
     Store.save();
     SFX.win();
     confetti(60);
-    const line = score === total ? 'Woo-hoo! Perfect! You are amazing!' : 'Yay! Great job! Well done!';
-    TTS.speak(line, null, { excited: true });
     U.app().innerHTML = `
       <main class="screen done-screen">
         <div class="done-emoji">🏆</div>
